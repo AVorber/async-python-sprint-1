@@ -1,0 +1,11 @@
+[tool.poetry]
+name = "async-python-sprint-1"
+version = "0.1.0"
+description = ""
+authors = ["Aleksandr Rebrov"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pytest = "^7.2.0"
+pytest-mock = "*"
