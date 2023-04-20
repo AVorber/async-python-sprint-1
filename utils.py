@@ -22,6 +22,8 @@ MIN_MINOR_PYTHON_VER = 9
 
 DRY_WEATHER = ('clear', 'overcast', 'cloudy', 'partly-cloudy')
 
+FILE_NAME = 'forecast_research.csv'
+
 
 def check_python_version():
     import sys
