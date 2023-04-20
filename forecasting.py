@@ -15,15 +15,26 @@ def forecast_weather():
     """
     Анализ погодных условий по городам
     """
-    initial_data_queue = multiprocessing.Queue()
-    producer = DataFetchingTask(queue=initial_data_queue)
-    consumer = DataCalculationTask(initial_data_queue=initial_data_queue)
-    producer.start()
-    consumer.start()
-    producer.join()
+    fetch_data_queue = multiprocessing.Queue()
+    aggregate_data_queue = multiprocessing.Queue()
+    data_fetching_producer = DataFetchingTask(fetch_data_queue=fetch_data_queue)
+    data_calculation_consumer = DataCalculationTask(
+        fetch_data_queue=fetch_data_queue,
+        aggregate_data_queue=aggregate_data_queue,
+    )
+    data_aggregation_consumer = DataAggregationTask(aggregate_data_queue=aggregate_data_queue)
+    data_fetching_producer.start()
+    print('DataFetchingTask start')
+    data_calculation_consumer.start()
+    print('DataCalculationTask start')
+    data_aggregation_consumer.start()
+    print('DataAggregationTask start')
+    data_fetching_producer.join()
     print('DataFetchingTask completed')
-    consumer.join()
+    data_calculation_consumer.join()
     print('DataCalculationTask completed')
+    data_aggregation_consumer.join()
+    print('DataAggregationTask completed')
 
 
 if __name__ == "__main__":

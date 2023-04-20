@@ -1,3 +1,4 @@
+import csv
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process, Queue, cpu_count
 
@@ -7,9 +8,9 @@ from utils import CITIES, DRY_WEATHER
 
 
 class DataFetchingTask(Process):
-    def __init__(self, queue: Queue):
+    def __init__(self, fetch_data_queue: Queue):
         super().__init__()
-        self.queue = queue
+        self.fetch_data_queue = fetch_data_queue
 
     def get_city_forecasts(self, city_name):
         return city_name, YandexWeatherAPI().get_forecasting(city_name=city_name)
@@ -17,14 +18,15 @@ class DataFetchingTask(Process):
     def run(self):
         with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
             for city_forecast in pool.map(self.get_city_forecasts, CITIES.keys()):
-                self.queue.put(InitialForecast(city=city_forecast[0], forecasts=city_forecast[1]['forecasts']))
-            self.queue.put(None)
+                self.fetch_data_queue.put(InitialForecast(city=city_forecast[0], forecasts=city_forecast[1]['forecasts']))
+            self.fetch_data_queue.put(None)
 
 
 class DataCalculationTask(Process):
-    def __init__(self, initial_data_queue: Queue):
+    def __init__(self, *, fetch_data_queue: Queue, aggregate_data_queue: Queue):
         super().__init__()
-        self.initial_data_queue = initial_data_queue
+        self.fetch_data_queue = fetch_data_queue
+        self.aggregate_data_queue = aggregate_data_queue
 
     @staticmethod
     def in_include_hours(hour):
@@ -33,16 +35,17 @@ class DataCalculationTask(Process):
     def get_daily_avg_temp(self, daily_forecast):
         hours = daily_forecast['hours']
         temps = [hour['temp'] for hour in hours if self.in_include_hours(hour=hour['hour'])]
+
         return round((sum(temps) / len(temps)), 1) if temps else None
 
     def get_total_dry_hours(self, daily_forecast):
         hours = daily_forecast['hours']
-        return sum(
-            [
-                1 for hour in hours
-                if hour['condition'] in DRY_WEATHER and self.in_include_hours(hour=hour['hour'])
-            ]
-        )
+        dry_hours = 0
+        for hour in hours:
+            if hour['condition'] in DRY_WEATHER and self.in_include_hours(hour=hour['hour']):
+                dry_hours += 1
+
+        return dry_hours
 
     def calc_city_temp(self, city_forcecast_data: InitialForecast) -> CityTemp:
         daily_avg_temps = []
@@ -64,12 +67,37 @@ class DataCalculationTask(Process):
         )
 
     def run(self):
-        while city_forcecast_data := self.initial_data_queue.get():
-            self.calc_city_temp(city_forcecast_data=city_forcecast_data)
+        while city_forcecast_data := self.fetch_data_queue.get():
+            self.aggregate_data_queue.put(self.calc_city_temp(city_forcecast_data=city_forcecast_data))
+        self.aggregate_data_queue.put(None)
 
 
-class DataAggregationTask:
-    pass
+class DataAggregationTask(Process):
+    def __init__(self, aggregate_data_queue: Queue):
+        super().__init__()
+        self.aggregate_data_queue = aggregate_data_queue
+
+    def agregate_forcecast(self, forcecast_data) -> dict:
+        df = {}
+        df['Город/день'] = forcecast_data.city
+        df[''] = 'Температура, среднее / Без осадков, часов'
+        for item in forcecast_data.daily_avg_temps:
+            date = item.date
+            avg_temp = item.avg_temp
+            total_dry_hours = item.total_dry_hours
+            df[date] = f'{avg_temp} / {total_dry_hours}'
+
+        return df
+
+    def run(self):
+        df_list = []
+        while city_forcecast_calc_data := self.aggregate_data_queue.get():
+            df_list.append(self.agregate_forcecast(forcecast_data=city_forcecast_calc_data))
+
+        with open('forecast_research.csv', 'w') as file:
+            writer = csv.DictWriter(file, delimiter=';', fieldnames=[*df_list[0]])
+            writer.writeheader()
+            writer.writerows(df_list)
 
 
 class DataAnalyzingTask:
