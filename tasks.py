@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process, Queue, cpu_count
-from typing import Any
 
 from api_client import YandexWeatherAPI
 from entities import DailyTemp, CityTemp, InitialForecast
@@ -47,16 +46,17 @@ class DataCalculationTask(Process):
 
     def calc_city_temp(self, city_forcecast_data: InitialForecast) -> CityTemp:
         daily_avg_temps = []
-        for daily_forecast in city_forcecast_data.forecasts:
-            daily_avg_temp = self.get_daily_avg_temp(daily_forecast=daily_forecast)
-            total_dry_hours = self.get_total_dry_hours(daily_forecast=daily_forecast)
-            daily_avg_temps.append(
-                DailyTemp(
-                    date=daily_forecast['date'],
-                    avg_temp=daily_avg_temp,
-                    total_dry_hours=total_dry_hours,
+        with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
+            for daily_forecast in city_forcecast_data.forecasts:
+                daily_avg_temp = pool.submit(self.get_daily_avg_temp, daily_forecast)
+                total_dry_hours = pool.submit(self.get_total_dry_hours, daily_forecast)
+                daily_avg_temps.append(
+                    DailyTemp(
+                        date=daily_forecast['date'],
+                        avg_temp=daily_avg_temp.result(),
+                        total_dry_hours=total_dry_hours.result(),
+                    )
                 )
-            )
 
         return CityTemp(
             city=city_forcecast_data.city,
@@ -65,9 +65,7 @@ class DataCalculationTask(Process):
 
     def run(self):
         while city_forcecast_data := self.initial_data_queue.get():
-            a = self.calc_city_temp(city_forcecast_data=city_forcecast_data)
-            print(a)
-            print('AAAAAAAAAAAAAAA')
+            self.calc_city_temp(city_forcecast_data=city_forcecast_data)
 
 
 class DataAggregationTask:
