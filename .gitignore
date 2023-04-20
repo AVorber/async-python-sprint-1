@@ -1,5 +1,7 @@
 
 creds.ini
-.idea/
+.direnv/
+.envrc
+.idea
 __pycache__/
 *.pyc

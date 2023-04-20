@@ -20,7 +20,7 @@ def forecast_weather():
     # city_name = "MOSCOW"
     # ywAPI = YandexWeatherAPI()
     # resp = ywAPI.get_forecasting(city_name)
-    pass
+    forcast_data = DataFetchingTask().get_forcast_data()
 
 
 if __name__ == "__main__":
