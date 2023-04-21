@@ -78,30 +78,27 @@ class DataCalculationTask(Process):
 
         return dry_hours
 
-    def calc_city_temp(self, city_forcecast_data: InitialForecast) -> CityTemp:
-        daily_avg_temps: list[DailyTemp] = []
-        with ThreadPoolExecutor() as pool:
-            for daily_forecast in city_forcecast_data.forecasts:
-                daily_avg_temp = pool.submit(self.get_daily_avg_temp, daily_forecast)
-                total_dry_hours = pool.submit(self.get_total_dry_hours, daily_forecast)
-                daily_avg_temps.append(
-                    DailyTemp(
-                        date=daily_forecast['date'],
-                        avg_temp=daily_avg_temp.result(),
-                        total_dry_hours=total_dry_hours.result(),
-                    )
-                )
+    def calc_daily_temp(self, daily_forcecast_data: dict[str, Any]) -> DailyTemp:
+        daily_avg_temp = self.get_daily_avg_temp(daily_forcecast_data)
+        total_dry_hours = self.get_total_dry_hours(daily_forcecast_data)
 
-        return CityTemp(
-            city=city_forcecast_data.city,
-            daily_avg_temps=daily_avg_temps,
+        return (
+            DailyTemp(
+                date=daily_forcecast_data['date'],
+                avg_temp=daily_avg_temp,
+                total_dry_hours=total_dry_hours,
+            )
         )
 
     def run(self) -> None:
         while city_forcecast_data := self.fetch_data_queue.get():
             with Pool() as pool:
-                result = pool.apply_async(self.calc_city_temp, (city_forcecast_data, ))
-                self.aggregate_data_queue.put(result.get())
+                daily_avg_temps = list(pool.map(self.calc_daily_temp, city_forcecast_data.forecasts))
+                city_temp: CityTemp = CityTemp(
+                    city=city_forcecast_data.city,
+                    daily_avg_temps=daily_avg_temps,
+                )
+                self.aggregate_data_queue.put(city_temp)
         self.aggregate_data_queue.put(None)
 
 
