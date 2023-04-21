@@ -20,9 +20,10 @@ def forecast_weather():
     """
     ywAPI = YandexWeatherAPI()
 
-    fetch_data_queue = multiprocessing.Queue()
-    aggregate_data_queue = multiprocessing.Queue()
-    analyz_data_queue = multiprocessing.Queue()
+    manager = multiprocessing.Manager()
+    fetch_data_queue = manager.Queue()
+    aggregate_data_queue = manager.Queue()
+    analyz_data_queue = manager.Queue()
 
     data_fetching_producer = DataFetchingTask(api=ywAPI, fetch_data_queue=fetch_data_queue, cities=CITIES)
     data_calculation_consumer = DataCalculationTask(
@@ -48,6 +49,7 @@ def forecast_weather():
     data_analyzing_consumer.join()
 
     logger.info('Анализ погодных условий завершен')
+
 
 if __name__ == "__main__":
     forecast_weather()

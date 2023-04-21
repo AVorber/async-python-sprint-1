@@ -2,7 +2,8 @@ import csv
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import reduce
-from multiprocessing import Process, Queue
+from multiprocessing import Pool, Process, Queue
+from multiprocessing.process import AuthenticationString
 from typing import Any
 
 from api_client import YandexWeatherAPI
@@ -44,6 +45,20 @@ class DataCalculationTask(Process):
         self.fetch_data_queue = fetch_data_queue
         self.aggregate_data_queue = aggregate_data_queue
 
+    def __getstate__(self):
+        """called when pickling - this hack allows subprocesses to
+           be spawned without the AuthenticationString raising an error"""
+        state = self.__dict__.copy()
+        conf = state['_config']
+        if 'authkey' in conf:
+            conf['authkey'] = bytes(conf['authkey'])
+        return state
+
+    def __setstate__(self, state):
+        """for unpickling"""
+        state['_config']['authkey'] = AuthenticationString(state['_config']['authkey'])
+        self.__dict__.update(state)
+
     @staticmethod
     def in_include_hours(hour) -> bool:
         return bool(int(hour) >= FROM_HOUR and int(hour) <= TO_HOUR)
@@ -84,7 +99,9 @@ class DataCalculationTask(Process):
 
     def run(self) -> None:
         while city_forcecast_data := self.fetch_data_queue.get():
-            self.aggregate_data_queue.put(self.calc_city_temp(city_forcecast_data=city_forcecast_data))
+            with Pool() as pool:
+                result = pool.apply_async(self.calc_city_temp, (city_forcecast_data, ))
+                self.aggregate_data_queue.put(result.get())
         self.aggregate_data_queue.put(None)
 
 
