@@ -7,7 +7,7 @@ from typing import Any
 
 from api_client import YandexWeatherAPI
 from entities import DailyTemp, CityTemp, InitialForecast
-from utils import DRY_WEATHER, FILE_NAME
+from utils import DRY_WEATHER, FILE_NAME, FROM_HOUR, TO_HOUR
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class DataCalculationTask(Process):
 
     @staticmethod
     def in_include_hours(hour) -> bool:
-        return bool(int(hour) >= 9 and int(hour) <= 19)
+        return bool(int(hour) >= FROM_HOUR and int(hour) <= TO_HOUR)
 
     def get_daily_avg_temp(self, daily_forecast: dict[str, Any]) -> float | None:
         hours = daily_forecast['hours']

@@ -20,6 +20,9 @@ ERR_MESSAGE_TEMPLATE = "Something wrong. Please contact with mentor."
 MIN_MAJOR_PYTHON_VER = 3
 MIN_MINOR_PYTHON_VER = 9
 
+FROM_HOUR = 9
+TO_HOUR = 19
+
 DRY_WEATHER = ('clear', 'overcast', 'cloudy', 'partly-cloudy')
 
 FILE_NAME = 'forecast_research.csv'
