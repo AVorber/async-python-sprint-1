@@ -2,7 +2,7 @@ import csv
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import reduce
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue
 from typing import Any
 
 from api_client import YandexWeatherAPI
@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class DataFetchingTask(Process):
-    def __init__(self, *, fetch_data_queue: Queue, cities: dict[str, Any]):
+    def __init__(self, *, api: YandexWeatherAPI, fetch_data_queue: Queue, cities: dict[str, Any]):
         super().__init__()
+        self.api = api
         self.fetch_data_queue = fetch_data_queue
         self.cities = cities
 
     def get_city_forecasts(self, city_name: str) -> tuple[str, dict[str, Any]]:
         try:
-            result = YandexWeatherAPI().get_forecasting(city_name=city_name)
+            result = self.api.get_forecasting(city_name=city_name)
         except Exception as error:
             logging.exception(f'Failed to fetch data from api: {error}')
             raise error
@@ -29,7 +30,7 @@ class DataFetchingTask(Process):
         return city_name, result
 
     def run(self) -> None:
-        with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
+        with ThreadPoolExecutor() as pool:
             for city_forecast in pool.map(self.get_city_forecasts, self.cities.keys()):
                 self.fetch_data_queue.put(
                     InitialForecast(city=city_forecast[0], forecasts=city_forecast[1]['forecasts'])
@@ -64,7 +65,7 @@ class DataCalculationTask(Process):
 
     def calc_city_temp(self, city_forcecast_data: InitialForecast) -> CityTemp:
         daily_avg_temps: list[DailyTemp] = []
-        with ThreadPoolExecutor(max_workers=cpu_count()) as pool:
+        with ThreadPoolExecutor() as pool:
             for daily_forecast in city_forcecast_data.forecasts:
                 daily_avg_temp = pool.submit(self.get_daily_avg_temp, daily_forecast)
                 total_dry_hours = pool.submit(self.get_total_dry_hours, daily_forecast)

@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 
+from api_client import YandexWeatherAPI
 from tasks import (
     DataFetchingTask,
     DataCalculationTask,
@@ -17,11 +18,13 @@ def forecast_weather():
     """
     Анализ погодных условий по городам
     """
+    ywAPI = YandexWeatherAPI()
+
     fetch_data_queue = multiprocessing.Queue()
     aggregate_data_queue = multiprocessing.Queue()
     analyz_data_queue = multiprocessing.Queue()
 
-    data_fetching_producer = DataFetchingTask(fetch_data_queue=fetch_data_queue, cities=CITIES)
+    data_fetching_producer = DataFetchingTask(api=ywAPI, fetch_data_queue=fetch_data_queue, cities=CITIES)
     data_calculation_consumer = DataCalculationTask(
         fetch_data_queue=fetch_data_queue,
         aggregate_data_queue=aggregate_data_queue,

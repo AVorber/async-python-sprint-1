@@ -9,7 +9,7 @@ from tasks import DataFetchingTask, DataCalculationTask
 class TestDataFetchingTask:
     def test_get_city_forecasts(self, mocker):
         # arrange
-        cities = {'foo': 'bar'}
+        task = DataFetchingTask(api=YandexWeatherAPI, fetch_data_queue=Queue, cities={'foo': 'bar'})
         get_forecasting_mock = mocker.patch.object(
             YandexWeatherAPI,
             'get_forecasting',
@@ -18,7 +18,7 @@ class TestDataFetchingTask:
         expected_result = ('foo', {'forecast': [{'item': 1}]})
 
         # act
-        result = DataFetchingTask(fetch_data_queue=Queue, cities=cities).get_city_forecasts('foo')
+        result = task.get_city_forecasts('foo')
 
         # assert
         assert result == expected_result
@@ -26,7 +26,7 @@ class TestDataFetchingTask:
 
     def test_get_city_forecasts__fetch_failed__raise(self, mocker, caplog):
         # arrange
-        cities = {'foo': 'bar'}
+        task = DataFetchingTask(api=YandexWeatherAPI, fetch_data_queue=Queue, cities={'foo': 'bar'})
         get_forecasting_mock = mocker.patch.object(
             YandexWeatherAPI,
             'get_forecasting',
@@ -35,7 +35,7 @@ class TestDataFetchingTask:
 
         # act & assert
         with pytest.raises(Exception):
-            DataFetchingTask(fetch_data_queue=Queue, cities=cities).get_city_forecasts('foo')
+            task.get_city_forecasts('foo')
 
         # assert
         get_forecasting_mock.assert_called_once_with(city_name='foo')
@@ -51,11 +51,11 @@ class TestDataFetchingTask:
 )
 class TestDataCalculationTask:
     def test_get_daily_avg_temp(self, hour, temp, expected_result):
-        # arrange & act
-        result = (
-            DataCalculationTask(fetch_data_queue=Queue, aggregate_data_queue=Queue)
-            .get_daily_avg_temp(daily_forecast={'hours': [{'hour': hour, 'temp': temp}]})
-        )
+        # arrange
+        task = DataCalculationTask(fetch_data_queue=Queue, aggregate_data_queue=Queue)
+
+        # act
+        result = task.get_daily_avg_temp(daily_forecast={'hours': [{'hour': hour, 'temp': temp}]})
 
         # assert
         assert result == expected_result
